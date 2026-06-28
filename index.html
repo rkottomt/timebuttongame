@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0f0a">
+  <title>TIME::BUTTON</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+
+    body {
+      font-family: "Courier New", Courier, monospace;
+      background: #0a0f0a;
+      color: #00ff41;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100dvh;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      position: relative;
+    }
+
+    /* Scanline overlay */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.15) 2px,
+        rgba(0, 0, 0, 0.15) 4px
+      );
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    /* Grid background */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0, 255, 65, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 65, 0.03) 1px, transparent 1px);
+      background-size: 24px 24px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      position: relative;
+      z-index: 1;
+      padding: 24px;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    .header {
+      position: absolute;
+      top: max(24px, env(safe-area-inset-top));
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 11px;
+      letter-spacing: 0.3em;
+      opacity: 0.6;
+      text-transform: uppercase;
+    }
+
+    .header .blink {
+      animation: blink 1.2s step-end infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+
+    .status-line {
+      position: absolute;
+      top: 52px;
+      font-size: 13px;
+      letter-spacing: 0.15em;
+      opacity: 0.85;
+      text-shadow: 0 0 8px rgba(0, 255, 65, 0.5);
+    }
+
+    .status-line.running {
+      color: #39ff14;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .status-line.stopped {
+      color: #00aa2a;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.85; }
+      50% { opacity: 1; text-shadow: 0 0 16px rgba(0, 255, 65, 0.8); }
+    }
+
+    /* Green circle tap button */
+    .tap-zone {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      width: 100%;
+    }
+
+    .tap-button {
+      width: min(220px, 55vw);
+      height: min(220px, 55vw);
+      border-radius: 50%;
+      border: 3px solid #00ff41;
+      background: radial-gradient(circle at 35% 35%, #1a3d1a, #0d1f0d 60%, #051005);
+      box-shadow:
+        0 0 30px rgba(0, 255, 65, 0.35),
+        0 0 60px rgba(0, 255, 65, 0.15),
+        inset 0 0 40px rgba(0, 255, 65, 0.08);
+      cursor: pointer;
+      transition: transform 0.1s ease, box-shadow 0.15s ease;
+      position: relative;
+      outline: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    .tap-button:active {
+      transform: scale(0.94);
+      box-shadow:
+        0 0 50px rgba(0, 255, 65, 0.55),
+        0 0 80px rgba(0, 255, 65, 0.25),
+        inset 0 0 50px rgba(0, 255, 65, 0.15);
+    }
+
+    .tap-button.running {
+      animation: ring-pulse 1.2s ease-in-out infinite;
+      border-color: #39ff14;
+    }
+
+    @keyframes ring-pulse {
+      0%, 100% { box-shadow: 0 0 30px rgba(0, 255, 65, 0.35), 0 0 60px rgba(0, 255, 65, 0.15), inset 0 0 40px rgba(0, 255, 65, 0.08); }
+      50% { box-shadow: 0 0 50px rgba(0, 255, 65, 0.6), 0 0 90px rgba(0, 255, 65, 0.3), inset 0 0 50px rgba(0, 255, 65, 0.2); }
+    }
+
+    .tap-button::after {
+      content: "TAP";
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      letter-spacing: 0.4em;
+      font-weight: bold;
+      color: rgba(0, 255, 65, 0.7);
+      text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+    }
+
+    .tap-button.running::after {
+      content: "STOP";
+    }
+
+    .hint {
+      position: absolute;
+      bottom: max(100px, calc(env(safe-area-inset-bottom) + 80px));
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      opacity: 0.45;
+      text-align: center;
+      line-height: 1.6;
+      padding: 0 24px;
+    }
+
+    .reveal-btn {
+      position: absolute;
+      bottom: max(24px, env(safe-area-inset-bottom));
+      background: transparent;
+      border: 1px solid #00ff41;
+      color: #00ff41;
+      font-family: inherit;
+      font-size: 13px;
+      letter-spacing: 0.25em;
+      padding: 14px 32px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: background 0.15s, box-shadow 0.15s;
+      outline: none;
+    }
+
+    .reveal-btn:active {
+      background: rgba(0, 255, 65, 0.15);
+      box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+    }
+
+    .reveal-btn:disabled {
+      opacity: 0.25;
+      pointer-events: none;
+    }
+
+    /* Reveal screen */
+    .reveal-container {
+      text-align: center;
+    }
+
+    .reveal-label {
+      font-size: 12px;
+      letter-spacing: 0.35em;
+      opacity: 0.5;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+    }
+
+    .reveal-time {
+      font-size: clamp(48px, 14vw, 72px);
+      font-weight: bold;
+      letter-spacing: 0.05em;
+      text-shadow:
+        0 0 20px rgba(0, 255, 65, 0.8),
+        0 0 40px rgba(0, 255, 65, 0.4);
+      line-height: 1.2;
+      animation: fade-in 0.6s ease;
+    }
+
+    .reveal-ms {
+      font-size: 0.45em;
+      opacity: 0.7;
+    }
+
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .reveal-sub {
+      margin-top: 24px;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      opacity: 0.4;
+    }
+
+    .back-btn {
+      margin-top: 48px;
+      background: transparent;
+      border: 1px solid #00ff41;
+      color: #00ff41;
+      font-family: inherit;
+      font-size: 13px;
+      letter-spacing: 0.25em;
+      padding: 14px 32px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: background 0.15s, box-shadow 0.15s;
+      outline: none;
+    }
+
+    .back-btn:active {
+      background: rgba(0, 255, 65, 0.15);
+      box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+    }
+
+    .session-count {
+      position: absolute;
+      bottom: max(72px, calc(env(safe-area-inset-bottom) + 48px));
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      opacity: 0.35;
+    }
+  </style>
+</head>
+<body>
+  <!-- Tap Screen -->
+  <div id="tapScreen" class="screen active">
+    <div class="header">&gt; TIME::BUTTON<span class="blink">_</span></div>
+    <div id="statusLine" class="status-line stopped">[ IDLE ]</div>
+
+    <div class="tap-zone">
+      <button id="tapButton" class="tap-button" aria-label="Tap to start or stop timer"></button>
+    </div>
+
+    <p class="hint">tap to start · tap again to stop<br>accumulate time · then reveal</p>
+    <p id="sessionCount" class="session-count"></p>
+
+    <button id="revealBtn" class="reveal-btn" disabled>&gt; REVEAL</button>
+  </div>
+
+  <!-- Reveal Screen -->
+  <div id="revealScreen" class="screen">
+    <div class="header">&gt; TIME::REVEAL<span class="blink">_</span></div>
+
+    <div class="reveal-container">
+      <p class="reveal-label">total elapsed</p>
+      <p id="revealTime" class="reveal-time">00:00<span class="reveal-ms">.000</span></p>
+      <p id="revealSub" class="reveal-sub"></p>
+      <button id="backBtn" class="back-btn">&gt; RESTART</button>
+    </div>
+  </div>
+
+  <script>
+    const tapScreen = document.getElementById("tapScreen");
+    const revealScreen = document.getElementById("revealScreen");
+    const tapButton = document.getElementById("tapButton");
+    const revealBtn = document.getElementById("revealBtn");
+    const backBtn = document.getElementById("backBtn");
+    const statusLine = document.getElementById("statusLine");
+    const sessionCount = document.getElementById("sessionCount");
+    const revealTime = document.getElementById("revealTime");
+    const revealSub = document.getElementById("revealSub");
+
+    let isRunning = false;
+    let startTime = 0;
+    let accumulatedMs = 0;
+    let lapCount = 0;
+
+    function formatTime(ms) {
+      const totalSeconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      const millis = ms % 1000;
+      const mm = String(minutes).padStart(2, "0");
+      const ss = String(seconds).padStart(2, "0");
+      const mmm = String(millis).padStart(3, "0");
+      return { main: `${mm}:${ss}`, ms: `.${mmm}` };
+    }
+
+    function getCurrentTotal() {
+      if (isRunning) {
+        return accumulatedMs + (performance.now() - startTime);
+      }
+      return accumulatedMs;
+    }
+
+    function updateUI() {
+      if (lapCount > 0 || accumulatedMs > 0) {
+        revealBtn.disabled = isRunning;
+        sessionCount.textContent = `[ ${lapCount} segment${lapCount !== 1 ? "s" : ""} recorded ]`;
+      } else {
+        revealBtn.disabled = true;
+        sessionCount.textContent = "";
+      }
+
+      if (isRunning) {
+        statusLine.textContent = "[ RUNNING ]";
+        statusLine.className = "status-line running";
+        tapButton.classList.add("running");
+      } else if (accumulatedMs > 0) {
+        statusLine.textContent = "[ PAUSED ]";
+        statusLine.className = "status-line stopped";
+        tapButton.classList.remove("running");
+      } else {
+        statusLine.textContent = "[ IDLE ]";
+        statusLine.className = "status-line stopped";
+        tapButton.classList.remove("running");
+      }
+    }
+
+    function toggleTimer() {
+      if (isRunning) {
+        accumulatedMs += performance.now() - startTime;
+        isRunning = false;
+        lapCount++;
+      } else {
+        startTime = performance.now();
+        isRunning = true;
+      }
+      updateUI();
+    }
+
+    function showReveal() {
+      if (isRunning) return;
+      const total = getCurrentTotal();
+      const formatted = formatTime(Math.round(total));
+      revealTime.innerHTML = `${formatted.main}<span class="reveal-ms">${formatted.ms}</span>`;
+      revealSub.textContent = `${lapCount} segment${lapCount !== 1 ? "s" : ""} · ${total}ms raw`;
+      tapScreen.classList.remove("active");
+      revealScreen.classList.add("active");
+    }
+
+    function restart() {
+      isRunning = false;
+      accumulatedMs = 0;
+      lapCount = 0;
+      startTime = 0;
+      revealScreen.classList.remove("active");
+      tapScreen.classList.add("active");
+      updateUI();
+    }
+
+    tapButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      toggleTimer();
+    });
+
+    revealBtn.addEventListener("click", showReveal);
+    backBtn.addEventListener("click", restart);
+
+    updateUI();
+  </script>
+</body>
+</html>
